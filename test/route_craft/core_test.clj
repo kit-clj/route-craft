@@ -2,7 +2,10 @@
   (:require
     [clojure.test :refer :all]
     [migratus.core :as migratus]
-    [next.jdbc :as jdbc]))
+    [next.jdbc :as jdbc]
+    [reitit.core :as reitit]
+    [reitit.ring :as ring]
+    [route-craft.core :as route-craft]))
 
 (defn ctx
   []
@@ -17,7 +20,13 @@
     (f)
     (migratus/rollback migratus-config)))
 
-(deftest breaking-test
-  (testing "test gha"
-    (ctx)
-    (is (= 1 2))))
+(use-fixtures :once test-fixture)
+
+(deftest reitit-ring-integration-test
+  (testing "reitit ring handler generation integration test"
+    (let [router (ring/router
+                   (route-craft/generate-reitit-crud-routes
+                     {:db-conn (jdbc/get-connection (:datasource (ctx)))}))]
+      (is (= true (reitit/router? router)))
+      (is (= "/attachments/:id" (:template (reitit/match-by-path router "/attachments/1"))))
+      (is (fn? (ring/ring-handler router))))))

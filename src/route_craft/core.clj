@@ -147,30 +147,29 @@
 ;; TODO: handle failed mapping finds more gracefully
 (defmethod generate-method-handler :get
   [{:keys [table id-key] :as opts} _]
-  [(str "/" id-key)
-   {:get        (partial get-by-id-handler opts)
-    :parameters {:path [:map [id-key (id-type opts)]]}
-    :responses  {200 {:body (table->malli-map table)}}}])
+  {:handler    (partial get-by-id-handler opts)
+   :parameters {:path [:map [id-key (id-type opts)]]}
+   :responses  {200 {:body (table->malli-map table)}}})
 
 (defmethod generate-method-handler :post
   [{:keys [table] :as opts} _]
-  ["" {:post       (partial create-handler opts)
-       :parameters {:body (table->malli-map table true)}
-       :responses  {200 {:body (table->malli-map table)}}}])
+  {:handler    (partial create-handler opts)
+   :parameters {:body (table->malli-map table true)}
+   :responses  {200 {:body (table->malli-map table)}}})
 
 (defmethod generate-method-handler :put
   [{:keys [table id-key] :as opts} _]
-  ["/:id" {:put        (partial update-by-id-handler opts)
-           :parameters {:path [:map [id-key (id-type opts)]]
-                        :body (table->malli-map table true {:force-optional? true})}
-           :responses  {200 {:body (table->malli-map table)}}}])
+  {:handler    (partial update-by-id-handler opts)
+   :parameters {:path [:map [id-key (id-type opts)]]
+                :body (table->malli-map table true {:force-optional? true})}
+   :responses  {200 {:body (table->malli-map table)}}})
 
 (defmethod generate-method-handler :delete
   [{:keys [id-key] :as opts} _]
   (let [malli-id-def [id-key (id-type opts)]]
-    ["/:id" {:delete     (partial delete-by-id-handler opts)
-             :parameters {:path [:map malli-id-def]}
-             :responses  {200 {:body [:map malli-id-def]}}}]))
+    {:handler    (partial delete-by-id-handler opts)
+     :parameters {:path [:map malli-id-def]}
+     :responses  {200 {:body [:map malli-id-def]}}}))
 
 (defmethod generate-method-handler :default
   [_ method]
@@ -179,16 +178,28 @@
 
 (defn routes-from-dbxray
   [{:keys [table-definitions]} {:keys [table-order tables]}]
-  (sequence
+  (into []
     (comp (map
             (fn [table]
               (let [table-opts (get table-definitions table)]
                 (when-not (:ignore? table-opts)
-                  [(str "/" (name table))
-                   (mapv (partial generate-method-handler {:table-name table
-                                                           :table      (get tables table)
-                                                           :id-key     (or (:id-key table-opts) default-id-key)})
-                         (get-in table-definitions [table :methods] default-methods))]))))
+                  (try (let [id-key             (or (:id-key table-opts) default-id-key)
+                             generate-method-fn (partial generate-method-handler {:table-name table
+                                                                                  :table      (get tables table)
+                                                                                  :id-key     id-key})]
+                         (->> (reduce
+                                (fn [out method]
+                                  (case method
+                                    :post (assoc-in out ["" method] (generate-method-fn method))
+                                    (assoc-in out [(str "/" id-key) method] (generate-method-fn method))))
+                                {}
+                                (get-in table-definitions [table :methods] default-methods))
+                              (vec)
+                              (cons (str "/" (name table)))
+                              (vec)))
+                       (catch Exception e
+                         (log/trace e "Route generation exception")
+                         (log/warn "Failed to generate routes for table" table ". Skipping.")))))))
           (filter identity))
     table-order))
 
@@ -207,7 +218,7 @@
 ;; handling defaults
 
 ;; table-definitions map
-;; if a table is not specified, it is assumed that all CRUD is permitted (? maybe dangerous)
+;; if a table is not specified, it is assumed that all CRUD is permitted (? maybe dangerous) TODO: change to opt in
 {:flyway_schema_history {:ignore? true}
  :locales               {:methods [:get]}
  }
@@ -219,8 +230,8 @@
            ]
     :as   opts}]
   (try
-    (let [db-xray (dbx/xray (jdbc/get-connection db-conn))]
-      )
+    (let [db-xray (dbx/xray db-conn)]
+      (routes-from-dbxray opts db-xray))
     (catch Exception e
       (log/error e "Failed to create reitit routes"))))
 
@@ -241,4 +252,8 @@
   (let [migratus-config {:migration-dir "test/resources/migrations"
                          :db            ctx
                          :store         :database}]
-    (migratus/migrate migratus-config)))
+    (migratus/migrate migratus-config))
+
+  (ring/router
+    (generate-reitit-crud-routes
+      {:db-conn (jdbc/get-connection (:datasource ctx))})))
