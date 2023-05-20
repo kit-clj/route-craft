@@ -16,3 +16,8 @@
     (migratus/migrate migratus-config)
     (f)
     (migratus/rollback migratus-config)))
+
+(deftest breaking-test
+  (testing "test gha"
+    (ctx)
+    (is (= 1 2))))
