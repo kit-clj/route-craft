@@ -203,6 +203,9 @@
 ;; ignore certain tables
 ;; permission definitions
 
+;; ignore certain columns / hide columns ?
+;; handling defaults
+
 ;; table-definitions map
 ;; if a table is not specified, it is assumed that all CRUD is permitted (? maybe dangerous)
 {:flyway_schema_history {:ignore? true}
