@@ -90,6 +90,8 @@
 ;; permit overriding handlers where specifed in config
 ;; malli schema for swaggerui
 
+;; TODO: extend in opts
+;; TODO: handle arrays
 (def malli-type-mapping
   {:integer     :int
    :bool        :boolean
@@ -218,3 +220,12 @@
       )
     (catch Exception e
       (log/error e "Failed to create reitit routes"))))
+
+(comment
+  (def ctx
+    {:datasource (jdbc/get-datasource {:jdbcUrl "jdbc:postgresql://127.0.0.1:5432/rc?user=rc&password=rc"})})
+
+  (let [migratus-config {:migration-dir "test/resources/migrations"
+                         :db            ctx
+                         :store         :database}]
+    (migratus/migrate migratus-config)))
