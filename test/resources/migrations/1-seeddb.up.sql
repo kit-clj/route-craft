@@ -43,12 +43,12 @@
 -- xml	 	XML data
 
 create extension if not exists hstore;
-
+--;;
 create table if not exists locales
 (
     locale text not null primary key
 );
-
+--;;
 create table if not exists addresses
 (
     id         bigserial primary key,
@@ -56,7 +56,7 @@ create table if not exists addresses
     address    text        not null,
     created_at timestamptz not null default now()
 );
-
+--;;
 create table if not exists companies
 (
     id          serial primary key,
@@ -64,9 +64,10 @@ create table if not exists companies
     is_enabled  boolean default true not null,
     open_hours  timetz               not null,
     close_hours timetz,
-    address_id  bigint references addresses (id) on delete cascade
+    address_id  bigint references addresses (id) on delete cascade,
+    locale      text references locales (locale) on delete cascade
 );
-
+--;;
 create table if not exists attachments
 (
     uuid        uuid primary key default gen_random_uuid(),
@@ -76,7 +77,7 @@ create table if not exists attachments
     created_at  timestamptz      default now() not null,
     valid_time  interval
 );
-
+--;;
 create table if not exists company_attachments
 (
     company_id int references companies (id) on delete cascade,
