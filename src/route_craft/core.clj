@@ -224,6 +224,16 @@
     (catch Exception e
       (log/error e "Failed to create reitit routes"))))
 
+;; BEYOND MVP
+;; - update by query
+;; - upsert
+;; - insert multi
+;; - delete by query
+;; - generic query
+;; - query only specific columns
+;; - resolve fks
+
+
 (comment
   (def ctx
     {:datasource (jdbc/get-datasource {:jdbcUrl "jdbc:postgresql://127.0.0.1:5432/rc?user=rc&password=rc"})})
