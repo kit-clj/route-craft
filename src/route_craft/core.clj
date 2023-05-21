@@ -33,15 +33,14 @@
   [request]
   (get-in request [:system/context :db-conn]))
 
-(defn get-by-id-handler
-  [{:keys [id-fn id-key req-db-conn table-name]
+(defn get-by-pk-handler
+  [{:keys [id-fn pk-key req-db-conn table-name]
     :or   {id-fn       path-id-fn
-           id-key      :id
            req-db-conn req-db-conn}
     :as   opts}
    request]
   (let [id (id-fn request)]
-    (if-let [resp (sql/get-by-id (req-db-conn request) (keyword table-name) id id-key)]
+    (if-let [resp (sql/get-by-id (req-db-conn request) (keyword table-name) id pk-key)]
       (http-response/ok resp)
       (http-response/not-found))))
 
@@ -56,10 +55,9 @@
                                    (keyword table-name)
                                    body))))
 
-(defn update-by-id-handler
-  [{:keys [id-fn id-key req-body req-db-conn table-name]
+(defn update-by-pk-handler
+  [{:keys [id-fn pk-key req-body req-db-conn table-name]
     :or   {id-fn       path-id-fn
-           id-key      :id
            req-body    req-body
            req-db-conn req-db-conn}
     :as   opts}
@@ -69,20 +67,19 @@
     (http-response/ok (sql/update! (req-db-conn request)
                                    (keyword table-name)
                                    body
-                                   {id-key id}))))
+                                   {pk-key id}))))
 
-(defn delete-by-id-handler
-  [{:keys [id-fn id-key req-db-conn table-name]
+(defn delete-by-pk-handler
+  [{:keys [id-fn pk-key req-db-conn table-name]
     :or   {id-fn       path-id-fn
-           id-key      :id
            req-db-conn req-db-conn}
     :as   opts}
    request]
   (let [id (id-fn request)]
     (sql/delete! (req-db-conn request)
                  (keyword table-name)
-                 {id-key id})
-    (http-response/ok [id-key id])))
+                 {pk-key id})
+    (http-response/ok [pk-key id])))
 
 ;; ===================ROUTING===================
 
@@ -90,9 +87,8 @@
 ;; permit overriding handlers where specifed in config
 ;; malli schema for swaggerui
 
-;; TODO: extend in opts
 ;; TODO: handle arrays
-(def malli-type-mapping
+(def base-malli-type-mappings
   {:integer     :int
    :bool        :boolean
    :text        :string
@@ -106,21 +102,18 @@
    :hstore      :any
    :oid         :string})
 
-(def default-methods [:get :post :put :delete])
-
-(def default-id-key :id)
-
-(defmulti generate-method-handler (fn [_opts method] method))
+(defmulti generate-handler (fn [_opts handler] handler))
 
 (defn id-type
-  [{:keys [table id-key]}]
-  (->> (get-in table [:columns id-key :column-type])
-       (get malli-type-mapping)))
+  [{:keys [malli-type-mappings table pk-key]}]
+  (->> (get-in table [:columns pk-key :column-type])
+       (get malli-type-mappings)))
 
 (defn malli-column-key
-  ([column-key column-meta] (malli-column-key column-key column-meta {:force-optional? false}))
-  ([column-key {:keys [column-type nullable?]} {:keys [force-optional?]}]
-   (let [malli-type (get malli-type-mapping column-type)]
+  ([malli-type-mappings column-key column-meta]
+   (malli-column-key malli-type-mappings column-key column-meta {:force-optional? false}))
+  ([malli-type-mappings column-key {:keys [column-type nullable?]} {:keys [force-optional?]}]
+   (let [malli-type (get malli-type-mappings column-type)]
      (cond
        nullable?
        [:maybe [column-key {:optional true} malli-type]]
@@ -132,76 +125,105 @@
        [column-key malli-type]))))
 
 (defn table->malli-map
-  ([table] (table->malli-map table false {}))
-  ([table ignore-primary-key?] (table->malli-map table ignore-primary-key? {:force-optional? false}))
-  ([{:keys [columns column-order]} ignore-primary-key? column-key-opts]
+  ([opts table] (table->malli-map opts table false {}))
+  ([opts table ignore-primary-key?] (table->malli-map opts table ignore-primary-key? {:force-optional? false}))
+  ([{:keys [malli-type-mappings]} {:keys [columns column-order]} ignore-primary-key? column-key-opts]
    (reduce
      (fn [out column-key]
        (let [{:keys [primary-key?] :as column} (get columns column-key)]
          (if (and primary-key? ignore-primary-key?)
            out
-           (conj out (malli-column-key column-key column column-key-opts)))))
+           (conj out (malli-column-key malli-type-mappings column-key column column-key-opts)))))
      [:map]
      column-order)))
 
 ;; TODO: handle failed mapping finds more gracefully
-(defmethod generate-method-handler :get
-  [{:keys [table id-key] :as opts} _]
-  {:handler    (partial get-by-id-handler opts)
-   :parameters {:path [:map [id-key (id-type opts)]]}
-   :responses  {200 {:body (table->malli-map table)}}})
+(defmethod generate-handler :get-by-pk
+  [{:keys [table pk-key] :as opts} _]
+  {:handler    (partial get-by-pk-handler opts)
+   :parameters {:path [:map [pk-key (id-type opts)]]}
+   :responses  {200 {:body (table->malli-map opts table)}}})
 
-(defmethod generate-method-handler :post
+(defmethod generate-handler :insert-one
   [{:keys [table] :as opts} _]
   {:handler    (partial create-handler opts)
    :parameters {:body (table->malli-map table true)}
-   :responses  {200 {:body (table->malli-map table)}}})
+   :responses  {200 {:body (table->malli-map opts table)}}})
 
-(defmethod generate-method-handler :put
-  [{:keys [table id-key] :as opts} _]
-  {:handler    (partial update-by-id-handler opts)
-   :parameters {:path [:map [id-key (id-type opts)]]
+(defmethod generate-handler :update-by-pk
+  [{:keys [table pk-key] :as opts} _]
+  {:handler    (partial update-by-pk-handler opts)
+   :parameters {:path [:map [pk-key (id-type opts)]]
                 :body (table->malli-map table true {:force-optional? true})}
-   :responses  {200 {:body (table->malli-map table)}}})
+   :responses  {200 {:body (table->malli-map opts table)}}})
 
-(defmethod generate-method-handler :delete
-  [{:keys [id-key] :as opts} _]
-  (let [malli-id-def [id-key (id-type opts)]]
-    {:handler    (partial delete-by-id-handler opts)
+(defmethod generate-handler :delete-by-pk
+  [{:keys [pk-key] :as opts} _]
+  (let [malli-id-def [pk-key (id-type opts)]]
+    {:handler    (partial delete-by-pk-handler opts)
      :parameters {:path [:map malli-id-def]}
      :responses  {200 {:body [:map malli-id-def]}}}))
 
-(defmethod generate-method-handler :default
-  [_ method]
-  (throw (ex-info "Unsupported method handler" {:type   ::unsupported-method-handler
-                                                :method method})))
+(defmethod generate-handler :default
+  [_ handler]
+  (throw (ex-info "Unsupported handler" {:type    ::unsupported-handler
+                                         :handler handler})))
+
+(defn get-pk-from-table
+  [{:keys [columns]}]
+  (let [pk-cols (reduce-kv (fn [out k {:keys [primary-key?]}]
+                             (if primary-key?
+                               (conj out k)
+                               out))
+                           #{}
+                           columns)]
+    (if (= 1 (count pk-cols))
+      (first pk-cols)
+      (throw (ex-info "Unexpected primary key count, please define manually" {:count (count pk-cols)
+                                                                              :type ::unexpected-pk-count})))))
+
+(defn table->reitit-routes
+  [{:keys [table-definitions default-handlers throw-on-failure? malli-type-mappings]
+    :or   {default-handlers  []
+           throw-on-failure? true}}
+   {:keys [tables]}
+   table]
+  (let [table-opts (get table-definitions table)]
+    (when-not (:ignore? table-opts)
+      (try (let [dbtable            (get tables table)
+                 pk-key             (or (:pk-key table-opts) (get-pk-from-table dbtable))
+                 pk-key-path        (str "/" pk-key)
+                 generate-handler-fn (partial generate-handler {:table-name          table
+                                                               :table               dbtable
+                                                               :pk-key              pk-key
+                                                               :malli-type-mappings malli-type-mappings})]
+             (->> (reduce
+                    (fn [out handler]
+                      (let [path (case handler
+                                   :insert-one ["" :post]
+                                   :get-by-pk [pk-key-path :get]
+                                   :update-by-pk [pk-key-path :put]
+                                   :delete-by-pk [pk-key-path :delete]
+                                   (throw (ex-info "Unsupported handler" {:type    ::unsupported-handler
+                                                                          :handler handler})))]
+                        (assoc-in out path (generate-handler-fn handler))))
+                    {}
+                    (get-in table-definitions [table :handlers] default-handlers))
+                  (vec)
+                  (cons (str "/" (name table)))
+                  (vec)))
+           (catch Exception e
+             (log/trace e "Route generation exception")
+             (log/warn "Failed to generate routes for table" table)
+             (when throw-on-failure?
+               (throw e)))))))
 
 (defn routes-from-dbxray
-  [{:keys [table-definitions]} {:keys [table-order tables]}]
+  [opts {:keys [table-order] :as db-xray}]
   (into []
-    (comp (map
-            (fn [table]
-              (let [table-opts (get table-definitions table)]
-                (when-not (:ignore? table-opts)
-                  (try (let [id-key             (or (:id-key table-opts) default-id-key)
-                             generate-method-fn (partial generate-method-handler {:table-name table
-                                                                                  :table      (get tables table)
-                                                                                  :id-key     id-key})]
-                         (->> (reduce
-                                (fn [out method]
-                                  (case method
-                                    :post (assoc-in out ["" method] (generate-method-fn method))
-                                    (assoc-in out [(str "/" id-key) method] (generate-method-fn method))))
-                                {}
-                                (get-in table-definitions [table :methods] default-methods))
-                              (vec)
-                              (cons (str "/" (name table)))
-                              (vec)))
-                       (catch Exception e
-                         (log/trace e "Route generation exception")
-                         (log/warn "Failed to generate routes for table" table ". Skipping.")))))))
-          (filter identity))
-    table-order))
+        (comp (map (partial table->reitit-routes opts db-xray))
+              (filter identity))
+        table-order))
 
 ;; ===================PERMISSIONS===================
 
@@ -217,23 +239,21 @@
 ;; ignore certain columns / hide columns ?
 ;; handling defaults
 
-;; table-definitions map
-;; if a table is not specified, it is assumed that all CRUD is permitted (? maybe dangerous) TODO: change to opt in
-{:flyway_schema_history {:ignore? true}
- :locales               {:methods [:get]}
- }
-
 (defn generate-reitit-crud-routes
   [{:keys [table-definitions
            role-parser-fn
-           db-conn
-           ]
+           malli-type-mappings
+           default-handlers
+           throw-on-failure?
+           db-conn]
     :as   opts}]
   (try
     (let [db-xray (dbx/xray db-conn)]
-      (routes-from-dbxray opts db-xray))
+      (routes-from-dbxray (update opts :malli-type-mappings #(merge base-malli-type-mappings %)) db-xray))
     (catch Exception e
-      (log/error e "Failed to create reitit routes"))))
+      (log/error e "Failed to create reitit routes")
+      (when throw-on-failure?
+        (throw e)))))
 
 ;; BEYOND MVP
 ;; - update by query

@@ -22,11 +22,16 @@
 
 (use-fixtures :once test-fixture)
 
+(def base-test-opts
+  {:default-handlers  [:get-by-pk :insert-one :update-by-pk :delete-by-pk]
+   :throw-on-failure? false
+   :table-definitions {:company_attachments {:handlers [:insert-one]}}})
+
 (deftest reitit-ring-integration-test
   (testing "reitit ring handler generation integration test"
     (let [router (ring/router
                    (route-craft/generate-reitit-crud-routes
-                     {:db-conn (jdbc/get-connection (:datasource (ctx)))}))]
+                     (assoc base-test-opts :db-conn (jdbc/get-connection (:datasource (ctx))))))]
       (is (= true (reitit/router? router)))
-      (is (= "/attachments/:id" (:template (reitit/match-by-path router "/attachments/1"))))
+      (is (= "/attachments/:uuid" (:template (reitit/match-by-path router "/attachments/1"))))
       (is (fn? (ring/ring-handler router))))))
