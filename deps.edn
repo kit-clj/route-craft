@@ -10,11 +10,15 @@
  {:build {:deps       {io.github.clojure/tools.build {:git/tag "v0.9.4" :git/sha "76b78fe"}}
           :ns-default build}
   :dev   {:extra-paths ["test"]
-          :extra-deps  {lambdaisland/kaocha {:mvn/version "1.75.1190"}
-                        migratus/migratus   {:mvn/version "1.4.9"}
-                        metosin/reitit      {:mvn/version "0.6.0"}}}
+          :extra-deps  {lambdaisland/kaocha                 {:mvn/version "1.75.1190"}
+                        migratus/migratus                   {:mvn/version "1.4.9"}
+                        metosin/reitit                      {:mvn/version "0.6.0"}
+                        org.apache.logging.log4j/log4j-api  {:mvn/version "2.20.0"}
+                        org.apache.logging.log4j/log4j-core {:mvn/version "2.20.0"}}}
   :test  {:extra-paths ["test"]
-          :extra-deps  {lambdaisland/kaocha {:mvn/version "1.75.1190"}
-                        migratus/migratus   {:mvn/version "1.4.9"}
-                        metosin/reitit      {:mvn/version "0.6.0"}}
+          :extra-deps  {lambdaisland/kaocha                 {:mvn/version "1.75.1190"}
+                        migratus/migratus                   {:mvn/version "1.4.9"}
+                        metosin/reitit                      {:mvn/version "0.6.0"}
+                        org.apache.logging.log4j/log4j-api  {:mvn/version "2.20.0"}
+                        org.apache.logging.log4j/log4j-core {:mvn/version "2.20.0"}}
           :main-opts   ["-m" "kaocha.runner"]}}}
