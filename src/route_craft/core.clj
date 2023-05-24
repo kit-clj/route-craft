@@ -2,10 +2,11 @@
   (:require
     [clojure.tools.logging :as log]
     [donut.dbxray :as dbx]
+    [kit.edge.db.postgres]
     [next.jdbc :as jdbc]
     [next.jdbc.sql :as sql]
     [ring.util.http-response :as http-response]
-    [kit.edge.db.postgres]))
+    [route-craft.xray-ext :as xray-ext]))
 
 ;; MVP
 
@@ -250,7 +251,7 @@
            db-conn]
     :as   opts}]
   (try
-    (let [db-xray (dbx/xray db-conn)]
+    (let [db-xray (-> db-conn (dbx/xray) (xray-ext/extend-db-xray))]
       (routes-from-dbxray (update opts :malli-type-mappings #(merge base-malli-type-mappings %)) db-xray))
     (catch Exception e
       (log/error e "Failed to create reitit routes")
