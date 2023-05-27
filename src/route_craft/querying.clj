@@ -1,4 +1,4 @@
-(ns route-craft.query-params)
+(ns route-craft.querying)
 
 ;; Goal: Support JSON
 ;; Query string encodable
