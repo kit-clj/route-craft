@@ -135,6 +135,15 @@
      :parameters {:path [:map malli-id-def]}
      :responses  {200 {:body [:map malli-id-def]}}}))
 
+;; BEYOND MVP
+;; - update by query
+;; - upsert
+;; - insert multi
+;; - delete by query
+;; - generic query
+;; - query only specific columns
+;; - resolve fks
+
 (defmethod generate-handler :default
   [_ handler]
   (throw (ex-info "Unsupported handler" {:type    ::unsupported-handler

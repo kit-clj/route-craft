@@ -22,11 +22,6 @@
    :hstore      :any
    :oid         :string})
 
-;; ===================PERMISSIONS===================
-
-;; Let user choose between RLS and app permissions
-;; Either way need way to fetch user id and role from request
-
 ;; ===================CONFIGURATION===================
 
 ;; specify which routes have which CRUD capabilities
@@ -51,15 +46,6 @@
       (log/error e "Failed to create reitit routes")
       (when throw-on-failure?
         (throw e)))))
-
-;; BEYOND MVP
-;; - update by query
-;; - upsert
-;; - insert multi
-;; - delete by query
-;; - generic query
-;; - query only specific columns
-;; - resolve fks
 
 
 (comment
