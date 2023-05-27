@@ -72,19 +72,23 @@
 
 (defmulti generate-handler (fn [_opts handler] handler))
 
+(defn malli-type
+  [malli-type-mappings {:keys [column-type] :rc/keys [array?]}]
+  (let [base-malli-type (get malli-type-mappings column-type)]
+    (if array?
+      [:vector base-malli-type]
+      base-malli-type)))
+
 (defn id-type
   [{:keys [malli-type-mappings table pk-key]}]
   (->> (get-in table [:columns pk-key :column-type])
-       (get malli-type-mappings)))
+       (malli-type malli-type-mappings)))
 
 (defn malli-column-key
   ([malli-type-mappings column-key column-meta]
    (malli-column-key malli-type-mappings column-key column-meta {:force-optional? false}))
-  ([malli-type-mappings column-key {:keys [column-type nullable? array?]} {:keys [force-optional?]}]
-   (let [base-malli-type (get malli-type-mappings column-type)
-         malli-type      (if array?
-                           [:vector base-malli-type]
-                           base-malli-type)]
+  ([malli-type-mappings column-key {:keys [column-type nullable?] :rc/keys [array?]} {:keys [force-optional?]}]
+   (let [malli-type (malli-type malli-type-mappings column-type)]
      (cond
        nullable?
        [:maybe [column-key {:optional true} malli-type]]

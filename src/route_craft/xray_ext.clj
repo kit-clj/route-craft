@@ -16,6 +16,7 @@
     #{}
     columns))
 
+;; TODO: refactor, test
 (defn extend-db-xray
   [db-xray]
   (update db-xray :tables
@@ -25,13 +26,17 @@
                 (assoc acc table-kw
                            (-> table
                                (assoc :rc/permitted-columns (column-names tables nil columns true))
-                               (update :columns (fn [{:keys [column-type] :as column}]
-                                                  (let [array? (boolean
-                                                                 (some-> column-type
-                                                                         (name)
-                                                                         (string/starts-with? "_")))]
-                                                    (cond-> column
-                                                            true (assoc :rc/array? array?)
-                                                            array? (update :column-type #(keyword (string/replace (name %) #"^_" ""))))))))))
+                               (update :columns (fn [columns]
+                                                  (reduce-kv (fn [acc column-key {:keys [column-type] :as column}]
+                                                               (assoc acc column-key
+                                                                          (let [array? (boolean
+                                                                                         (some-> column-type
+                                                                                                 (name)
+                                                                                                 (string/starts-with? "_")))]
+                                                                            (cond-> column
+                                                                                    true (assoc :rc/array? array?)
+                                                                                    array? (update :column-type #(keyword (string/replace (name %) #"^_" "")))))))
+                                                             {}
+                                                             columns))))))
               {}
               tables))))

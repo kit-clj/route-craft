@@ -7,7 +7,7 @@
     [route-craft.routes :as routes]
     [route-craft.xray-ext :as xray-ext]))
 
-(def base-malli-type-mappings
+(def ^:private base-malli-type-mappings
   {:integer     :int
    :bool        :boolean
    :text        :string
@@ -32,6 +32,7 @@
 ;; handling defaults
 
 (defn generate-reitit-crud-routes
+  ""
   [{:keys [table-definitions
            role-parser-fn
            malli-type-mappings
