@@ -1,5 +1,6 @@
 (ns route-craft.xray-ext
-  "Extended data given db-xray output")
+  "Extended data given db-xray output"
+  (:require [clojure.string :as string]))
 
 (defn column-names
   [tables table-prefix columns expand-references?]
@@ -22,6 +23,15 @@
             (reduce-kv
               (fn [acc table-kw {:keys [columns] :as table}]
                 (assoc acc table-kw
-                           (assoc table :rc/permitted-columns (column-names tables nil columns true))))
+                           (-> table
+                               (assoc :rc/permitted-columns (column-names tables nil columns true))
+                               (update :columns (fn [{:keys [column-type] :as column}]
+                                                  (let [array? (boolean
+                                                                 (some-> column-type
+                                                                         (name)
+                                                                         (string/starts-with? "_")))]
+                                                    (cond-> column
+                                                            true (assoc :rc/array? array?)
+                                                            array? (update :column-type #(keyword (string/replace (name %) #"^_" ""))))))))))
               {}
               tables))))
