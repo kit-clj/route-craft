@@ -3,6 +3,30 @@
     [clojure.tools.logging :as log]
     [route-craft.handlers :as handlers]))
 
+;; Custom query validation
+
+(def valid-order [:enum
+                  "asc"
+                  "desc"
+                  "asc-nulls-first"
+                  "asc-nulls-last"
+                  "desc-nulls-first"
+                  "desc-nulls-last"])
+(def valid-joins [:enum "left" "right" "inner" "full" "cross"])
+(def valid-ops [:enum :eq :neq :like :nlike :ilike :nilike :gt :gte :lt :lte :in :nin])
+
+(defn malli-query-params
+  [{:rc/keys [permitted-columns]}]
+  (let [columns-kw-enum  (vec (cons :enum permitted-columns))
+        columns-str-enum (vec (cons :enum (map name permitted-columns)))]
+    [:map
+     [:where {:optional true} [:map-of columns-kw-enum [:map-of valid-ops any?]]]
+     [:joins {:optional true} [:map-of columns-kw-enum valid-joins]]
+     [:limit {:optional true} :int]
+     [:offset {:optional true} :int]
+     [:columns {:optional true} [:vector columns-str-enum]]
+     [:order {:optional true} [:vector [:map-of columns-kw-enum valid-order]]]]))
+
 ;; ===================ROUTING===================
 
 ;; generate crud routes using default handlers

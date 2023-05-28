@@ -61,3 +61,7 @@
   (ring/router
     (generate-reitit-crud-routes
       {:db-conn (jdbc/get-connection (:datasource ctx))})))
+
+
+;; Future work:
+;; - caching

@@ -1,6 +1,7 @@
 (ns route-craft.handlers
-  (:require [next.jdbc.sql :as sql]
-            [ring.util.http-response :as http-response]))
+  (:require
+    [next.jdbc.sql :as sql]
+    [ring.util.http-response :as http-response]))
 
 ;; ===================HANDLERS===================
 
@@ -145,8 +146,6 @@
 ;; - insert multi
 ;; - delete by query
 ;; - generic query
-;; - query only specific columns
-;; - resolve fks
 
 (defmethod generate-handler :default
   [_ handler]
