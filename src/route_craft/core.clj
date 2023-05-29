@@ -3,7 +3,6 @@
     [clojure.tools.logging :as log]
     [donut.dbxray :as dbx]
     [kit.edge.db.postgres]
-    [next.jdbc :as jdbc]
     [route-craft.routes :as routes]
     [route-craft.xray-ext :as xray-ext]))
 
