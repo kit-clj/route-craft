@@ -1,6 +1,7 @@
 (ns route-craft.handlers
   (:require
     [next.jdbc.sql :as sql]
+    [route-craft.queries :as queries]
     [ring.util.http-response :as http-response]))
 
 ;; ===================HANDLERS===================
@@ -71,6 +72,12 @@
                  {pk-key id})
     (http-response/ok [pk-key id])))
 
+(defn query-handler
+  [{:keys []
+    :as   opts}
+   request]
+  #_(queries/rc-query->query-map))
+
 (defmulti generate-handler (fn [_opts handler] handler))
 
 (defn malli-type
@@ -105,11 +112,11 @@
   ([opts table ignore-primary-key?] (table->malli-map opts table ignore-primary-key? {:force-optional? false}))
   ([{:keys [malli-type-mappings]} {:keys [columns column-order]} ignore-primary-key? column-key-opts]
    (reduce
-     (fn [out column-key]
+     (fn [acc column-key]
        (let [{:keys [primary-key?] :as column} (get columns column-key)]
          (if (and primary-key? ignore-primary-key?)
-           out
-           (conj out (malli-column-key malli-type-mappings column-key column column-key-opts)))))
+           acc
+           (conj acc (malli-column-key malli-type-mappings column-key column column-key-opts)))))
      [:map]
      column-order)))
 
@@ -146,6 +153,10 @@
 ;; - insert multi
 ;; - delete by query
 ;; - generic query
+
+(defmethod generate-handler :get-by-query
+  [{:keys [] :as opts} _]
+  )
 
 (defmethod generate-handler :default
   [_ handler]

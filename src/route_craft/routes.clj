@@ -35,10 +35,10 @@
 
 (defn get-pk-from-table
   [{:keys [columns]}]
-  (let [pk-cols (reduce-kv (fn [out k {:keys [primary-key?]}]
+  (let [pk-cols (reduce-kv (fn [acc k {:keys [primary-key?]}]
                              (if primary-key?
-                               (conj out k)
-                               out))
+                               (conj acc k)
+                               acc))
                            #{}
                            columns)]
     (if (= 1 (count pk-cols))
@@ -64,7 +64,7 @@
                                                                              :pk-key              pk-key
                                                                              :malli-type-mappings malli-type-mappings})]
                  (->> (reduce
-                        (fn [out handler]
+                        (fn [acc handler]
                           (let [path (case handler
                                        :insert-one ["" :post]
                                        :get-by-pk [pk-key-path :get]
@@ -72,7 +72,7 @@
                                        :delete-by-pk [pk-key-path :delete]
                                        (throw (ex-info "Unsupported handler" {:type    ::unsupported-handler
                                                                               :handler handler})))]
-                            (assoc-in out path (generate-handler-fn handler))))
+                            (assoc-in acc path (generate-handler-fn handler))))
                         {}
                         handlers)
                       (vec)

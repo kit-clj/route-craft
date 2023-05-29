@@ -17,6 +17,7 @@
     columns))
 
 ;; TODO: refactor, test
+;; TODO: limit rc/permitted-columns
 (defn extend-db-xray
   [db-xray]
   (update db-xray :tables
